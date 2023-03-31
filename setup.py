@@ -10,7 +10,7 @@ setup(name='tap-google-ads',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_google_ads'],
       install_requires=[
-          'singer-python==5.12.2',
+          'singer-python @ git+https://github.com/peliqan-io/singer-python@master'
           'requests==2.26.0',
           'backoff==1.8.0',
           'google-ads==19.0.0',
