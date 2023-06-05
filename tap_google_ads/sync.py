@@ -1,6 +1,7 @@
 import json
 import singer
 from tap_google_ads.client import create_sdk_client
+from tap_google_ads.customers import all_customers
 from tap_google_ads.streams import initialize_core_streams, initialize_reports
 
 LOGGER = singer.get_logger()
@@ -19,6 +20,7 @@ def get_currently_syncing(state):
 
 def sort_customers(customers):
     return sorted(customers, key=lambda x: x["customerId"])
+
 
 def sort_selected_streams(sort_list):
     return sorted(sort_list, key=lambda x: x["tap_stream_id"])
@@ -53,6 +55,7 @@ def shuffle(shuffle_list, shuffle_key, current_value, sort_function):
 
     return top_half + bottom_half
 
+
 def get_query_limit(config):
     """
     This function will get the query_limit from config,
@@ -70,16 +73,30 @@ def get_query_limit(config):
         LOGGER.warning(f"The entered query limit is invalid; it will be set to the default query limit of {DEFAULT_QUERY_LIMIT}")
         return DEFAULT_QUERY_LIMIT
 
+
+def get_managed_customers(config, login_customer_id):
+    customers = []
+    sdk_client = create_sdk_client(config, login_customer_id)
+    query_customers = all_customers(sdk_client, login_customer_id)
+    for manager, clients in query_customers.items():
+        for client in clients:
+            customers.append({"loginCustomerId": manager, "customerId": client.client_customer.removeprefix('customers/')})
+    return customers
+
 def do_sync(config, catalog, resource_schema, state):
     # QA ADDED WORKAROUND [START]
     try:
-        customers = json.loads(config["login_customer_ids"])
+        login_customer_id = json.loads(config["login_customer_id"])
+        #customers = json.loads(config["login_customer_ids"])
     except TypeError:  # falling back to raw value
-        customers = config["login_customer_ids"]
+        login_customer_id = config["login_customer_id"]
+        #customers = config["login_customer_ids"]
+
+    customers = get_managed_customers(config, login_customer_id)
 
     # Get query limit
     query_limit = get_query_limit(config)
-    # QA ADDED WORKAROUND [END]
+    # # QA ADDED WORKAROUND [END]
     customers = sort_customers(customers)
 
     selected_streams = [

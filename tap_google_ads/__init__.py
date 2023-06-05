@@ -15,7 +15,7 @@ REQUIRED_CONFIG_KEYS = [
     "oauth_client_id",
     "oauth_client_secret",
     "refresh_token",
-    "login_customer_ids",
+    "login_customer_id",
     "developer_token",
 ]
 

@@ -56,6 +56,7 @@ def get_request_timeout(config):
         request_timeout = DEFAULT_REQUEST_TIMEOUT
     return request_timeout
 
+
 def create_nested_resource_schema(resource_schema, fields):
     new_schema = {
         "type": ["null", "object"],
@@ -94,6 +95,7 @@ def get_selected_fields(stream_mdata):
 def build_parameters():
     param_str = ",".join(f"{k}={v}" for k, v in API_PARAMETERS.items())
     return f"PARAMETERS {param_str}"
+
 
 def generate_where_and_orderby_clause(last_pk_fetched, filter_param, composite_pks):
     """
@@ -142,6 +144,7 @@ def generate_where_and_orderby_clause(last_pk_fetched, filter_param, composite_p
 
     return f'{where_clause}{order_by_clause}'
 
+
 def create_core_stream_query(resource_name, selected_fields, last_pk_fetched, filter_param, composite_pks, limit=None):
 
     # Generate a query using WHERE and ORDER BY parameters.
@@ -188,6 +191,7 @@ retryable_errors = [
     "InternalError.TRANSIENT_ERROR",
     "InternalError.DEADLINE_EXCEEDED",
 ]
+
 
 timeout_errors = [
     "RequestError.RPC_DEADLINE_TOO_SHORT",
@@ -262,12 +266,14 @@ def filter_out_non_attribute_fields(fields):
             for field_name, field_data in fields.items()
             if field_data["field_details"]["category"] == "ATTRIBUTE"}
 
+
 def write_bookmark_for_core_streams(state, stream, customer_id, last_pk_fetched):
     # Write bookmark for core streams.
     singer.write_bookmark(state, stream, customer_id, {'last_pk_fetched': last_pk_fetched})
 
     singer.write_state(state)
     LOGGER.info("Write state for stream: %s, value: %s", stream, last_pk_fetched)
+
 
 class BaseStream:  # pylint: disable=too-many-instance-attributes
 
@@ -499,6 +505,7 @@ class BaseStream:  # pylint: disable=too-many-instance-attributes
         if stream["tap_stream_id"] in state.get('bookmarks', {}):
             state['bookmarks'].pop(stream["tap_stream_id"])
             singer.write_state(state)
+
 
 def get_query_date(start_date, bookmark, conversion_window_date):
     """Return a date within the conversion window and after start date
@@ -1148,6 +1155,11 @@ def initialize_reports(resource_schema):
             ["shopping_performance_view"],
             resource_schema,
             ["_sdc_record_hash"],
+            {
+                "ad_group_criterion_criterion_id",
+                "ad_group_id",
+                "campaign_id"
+            },
         ),
         "user_location_performance_report": ReportStream(
             report_definitions.USER_LOCATION_PERFORMANCE_REPORT_FIELDS,
