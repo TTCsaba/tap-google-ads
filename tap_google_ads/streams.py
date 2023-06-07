@@ -159,11 +159,12 @@ def create_core_stream_query(resource_name, selected_fields, last_pk_fetched, fi
     return core_query
 
 
-def create_report_query(resource_name, selected_fields, query_date):
+def create_report_query(resource_name, selected_fields, start_date, end_date):
 
     format_str = "%Y-%m-%d"
-    query_date = utils.strftime(query_date, format_str=format_str)
-    report_query = f"SELECT {','.join(selected_fields)} FROM {resource_name} WHERE segments.date = '{query_date}' {build_parameters()}"
+    start_date = utils.strftime(start_date, format_str=format_str)
+    end_date = utils.strftime(end_date, format_str=format_str)
+    report_query = f"SELECT {','.join(selected_fields)} FROM {resource_name} WHERE segments.date BETWEEN '{start_date}' AND '{end_date}' {build_parameters()}"
 
     return report_query
 
@@ -667,7 +668,7 @@ class ReportStream(BaseStream):
             # Add inclusion metadata
             if self.behavior[report_field]:
                 inclusion = "available"
-                if transformed_field_name in ({"date"} | self.automatic_keys):
+                if transformed_field_name in (self.automatic_keys):
                     inclusion = "automatic"
             else:
                 inclusion = "unsupported"
@@ -742,34 +743,30 @@ class ReportStream(BaseStream):
         if selected_fields == {'segments.date'}:
             raise Exception(f"Selected fields is currently limited to {', '.join(selected_fields)}. Please select at least one attribute and metric in order to replicate {stream_name}.")
 
-        while query_date <= end_date:
-            query = create_report_query(resource_name, selected_fields, query_date)
-            LOGGER.info(f"Requesting {stream_name} data for {utils.strftime(query_date, '%Y-%m-%d')}.")
+        query = create_report_query(resource_name, selected_fields, query_date, end_date)
+        LOGGER.info(f"Requesting {stream_name} data for {utils.strftime(query_date, '%Y-%m-%d')}.")
 
-            try:
-                response = make_request(gas, query, customer["customerId"], config)
-            except GoogleAdsException as err:
-                LOGGER.warning("Failed query: %s", query)
-                LOGGER.critical(str(err.failure.errors[0].message))
-                raise RuntimeError from None
+        try:
+            response = make_request(gas, query, customer["customerId"], config)
+        except GoogleAdsException as err:
+            LOGGER.warning("Failed query: %s", query)
+            LOGGER.critical(str(err.failure.errors[0].message))
+            raise RuntimeError from None
 
+        with Transformer() as transformer:
+            # Pages are fetched automatically while iterating through the response
+            for message in response:
+                json_message = google_message_to_json(message)
+                transformed_message = self.transform_keys(json_message)
+                record = transformer.transform(transformed_message, stream["schema"])
+                record["_sdc_record_hash"] = generate_hash(record, stream_mdata)
 
-            with Transformer() as transformer:
-                # Pages are fetched automatically while iterating through the response
-                for message in response:
-                    json_message = google_message_to_json(message)
-                    transformed_message = self.transform_keys(json_message)
-                    record = transformer.transform(transformed_message, stream["schema"])
-                    record["_sdc_record_hash"] = generate_hash(record, stream_mdata)
+                singer.write_record(stream_name, record)
 
-                    singer.write_record(stream_name, record)
+        new_bookmark_value = {replication_key: utils.strftime(query_date)}
+        singer.write_bookmark(state, stream["tap_stream_id"], customer["customerId"], new_bookmark_value)
 
-            new_bookmark_value = {replication_key: utils.strftime(query_date)}
-            singer.write_bookmark(state, stream["tap_stream_id"], customer["customerId"], new_bookmark_value)
-
-            singer.write_state(state)
-
-            query_date += timedelta(days=1)
+        singer.write_state(state)
 
 
 def initialize_core_streams(resource_schema):

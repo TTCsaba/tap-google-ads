@@ -10,6 +10,7 @@ def all_customers(client, login_customer_id=None):
 
     # Gets instances of the GoogleAdsService and CustomerService clients.
     googleads_service = client.get_service("GoogleAdsService")
+    customer_service = client.get_service("CustomerService")
 
 
     # Creates a query that retrieves all child accounts of the manager
@@ -29,8 +30,32 @@ def all_customers(client, login_customer_id=None):
     # If a Manager ID was provided in the customerId parameter, it will be
     # the only ID in the list. Otherwise, we will issue a request for all
     # customers accessible by this authenticated Google account.
+    seed_customer_ids = []
+    if login_customer_id is None:
+        customer_resource_names = (
+            customer_service.list_accessible_customers().resource_names
+        )
+        for customer_resource_name in customer_resource_names:
+            customer_id = googleads_service.parse_customer_path(
+                customer_resource_name
+            )["customer_id"]
+            c_query = f"""
+                SELECT
+                customer.status, customer.manager
+                FROM customer
+                WHERE customer.id = '{customer_id}'
+            """
+            try:
+                c_result = googleads_service.search(customer_id=str(customer_id), query=c_query)
+            except:
+                continue
+            c_customer = list(c_result)[0].customer
+            if c_customer.manager or c_customer.status != 2:
+                continue
+            seed_customer_ids.append(customer_id)
+        return seed_customer_ids
+    
     seed_customer_ids = [login_customer_id]
-
     customer_ids_to_child_accounts = dict()
 
     for seed_customer_id in seed_customer_ids:
@@ -77,5 +102,4 @@ def all_customers(client, login_customer_id=None):
                         and customer_client.level == 1
                     ):
                         unprocessed_customer_ids.append(customer_client.id)
-        
-    return customer_ids_to_child_accounts
+    return [m[0].client_customer.removeprefix('customers/') for m in customer_ids_to_child_accounts.values()]

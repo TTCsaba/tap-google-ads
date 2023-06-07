@@ -74,29 +74,30 @@ def get_query_limit(config):
         return DEFAULT_QUERY_LIMIT
 
 
-def get_managed_customers(config, login_customer_id):
+def get_managed_customers(config):
+    try:
+        manager_account_id = json.loads(config.get("manager_account_id", None))
+    except TypeError:  # falling back to raw value
+        manager_account_id = config.get("manager_account_id", None)
+    
+    selected_account_ids = config.get('account_ids', [])
+    
     customers = []
-    sdk_client = create_sdk_client(config, login_customer_id)
-    query_customers = all_customers(sdk_client, login_customer_id)
-    for manager, clients in query_customers.items():
-        for client in clients:
-            customers.append({"loginCustomerId": manager, "customerId": client.client_customer.removeprefix('customers/')})
+    sdk_client = create_sdk_client(config, manager_account_id)
+    query_customers = all_customers(sdk_client, manager_account_id)
+    if (not manager_account_id) or (manager_account_id and selected_account_ids):
+        query_customers = [c for c in query_customers if c in selected_account_ids]
+
+    for client in query_customers:
+        customers.append({"loginCustomerId": manager_account_id, "customerId": client})
     return customers
 
-def do_sync(config, catalog, resource_schema, state):
-    # QA ADDED WORKAROUND [START]
-    try:
-        login_customer_id = json.loads(config["login_customer_id"])
-        #customers = json.loads(config["login_customer_ids"])
-    except TypeError:  # falling back to raw value
-        login_customer_id = config["login_customer_id"]
-        #customers = config["login_customer_ids"]
 
-    customers = get_managed_customers(config, login_customer_id)
+def do_sync(config, catalog, resource_schema, state):
+    customers = get_managed_customers(config)
 
     # Get query limit
     query_limit = get_query_limit(config)
-    # # QA ADDED WORKAROUND [END]
     customers = sort_customers(customers)
 
     selected_streams = [
