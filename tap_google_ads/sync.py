@@ -75,7 +75,7 @@ def get_query_limit(config):
 
 
 def get_managed_customers(config):
-    manager_account_id = config.get("manager_account_id", None)
+    manager_account_id = config.get("manager_account_id", None) or None
     selected_account_ids = config.get('account_ids', [])
     
     customers = []
