@@ -75,11 +75,7 @@ def get_query_limit(config):
 
 
 def get_managed_customers(config):
-    try:
-        manager_account_id = json.loads(config.get("manager_account_id", None))
-    except TypeError:  # falling back to raw value
-        manager_account_id = config.get("manager_account_id", None)
-    
+    manager_account_id = config.get("manager_account_id", None)
     selected_account_ids = config.get('account_ids', [])
     
     customers = []
