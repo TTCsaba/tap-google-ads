@@ -1010,7 +1010,7 @@ def initialize_reports(resource_schema):
             ["campaign"],
             resource_schema,
             ["_sdc_record_hash"],
-            {"campaign_id"},
+            {"campaign_id", "date"},
         ),
         "campaign_audience_performance_report": ReportStream(
             report_definitions.CAMPAIGN_AUDIENCE_PERFORMANCE_REPORT_FIELDS,

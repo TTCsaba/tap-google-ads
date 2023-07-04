@@ -10,7 +10,7 @@ base_streams = [
     "CALL_VIEW",
     "CAMPAIGN_BUDGET",
     "CAMPAIGN_CRITERION",
-    "CAMPAIGN",
+    "CAMPAIGNS",
     "CAMPAIGN_LABEL",
     "CARRIER_CONSTANT",
     "FEED",
