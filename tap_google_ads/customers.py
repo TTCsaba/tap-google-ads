@@ -13,20 +13,6 @@ def all_customers(client, login_customer_id=None):
     customer_service = client.get_service("CustomerService")
 
 
-    # Creates a query that retrieves all child accounts of the manager
-    # specified in search calls below.
-    query = """
-        SELECT
-          customer_client.client_customer,
-          customer_client.level,
-          customer_client.manager,
-          customer_client.descriptive_name,
-          customer_client.currency_code,
-          customer_client.time_zone,
-          customer_client.id
-        FROM customer_client
-        WHERE customer_client.level <= 1"""
-
     # If a Manager ID was provided in the customerId parameter, it will be
     # the only ID in the list. Otherwise, we will issue a request for all
     # customers accessible by this authenticated Google account.
@@ -54,6 +40,20 @@ def all_customers(client, login_customer_id=None):
                 continue
             seed_customer_ids.append(customer_id)
         return seed_customer_ids
+    
+    # Creates a query that retrieves all child accounts of the manager
+    # specified in search calls below.
+    query = """
+        SELECT
+          customer_client.client_customer,
+          customer_client.level,
+          customer_client.manager,
+          customer_client.descriptive_name,
+          customer_client.currency_code,
+          customer_client.time_zone,
+          customer_client.id
+        FROM customer_client
+        WHERE customer_client.level <= 1"""
     
     seed_customer_ids = [login_customer_id]
     customer_ids_to_child_accounts = dict()
@@ -102,4 +102,9 @@ def all_customers(client, login_customer_id=None):
                         and customer_client.level == 1
                     ):
                         unprocessed_customer_ids.append(customer_client.id)
-    return [m[0].client_customer.removeprefix('customers/') for m in customer_ids_to_child_accounts.values()]
+    all_customers = []
+    for accounts in customer_ids_to_child_accounts.values():
+        for account in accounts:
+            if not account.manager:
+                all_customers.append(str(account.id))
+    return all_customers
