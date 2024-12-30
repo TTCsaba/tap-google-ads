@@ -447,7 +447,7 @@ class BaseStream:  # pylint: disable=too-many-instance-attributes
 
         # LIMIT clause in the `ad_group_criterion` and `campaign_criterion`(stream which has composite primary keys) may result in the infinite loop.
         # For example, the limit is 10. campaign_criterion stream have total 20 records with campaign_id = 1.
-        # So, in the first call, the tap retrieves 10 records and the next time query would look like the below,
+        # So, in the first call, the tap retrieves 10 reco rds and the next time query would look like the below,
         # WHERE campaign_id >= 1
         # Now, the tap will again fetch records with campaign_id = 1.
         # That's why we should not pass the LIMIT clause in the query of these streams.
@@ -1022,16 +1022,16 @@ def initialize_reports(resource_schema):
                 "campaign_criterion_criterion_id",
             },
         ),
-        "click_performance_report": ReportStream(
-            report_definitions.CLICK_PERFORMANCE_REPORT_FIELDS,
-            ["click_view"],
-            resource_schema,
-            ["_sdc_record_hash"],
-            {
-                "clicks",
-                "click_view_gclid",
-            },
-        ),
+        # "click_performance_report": ReportStream(
+        #     report_definitions.CLICK_PERFORMANCE_REPORT_FIELDS,
+        #     ["click_view"],
+        #     resource_schema,
+        #     ["_sdc_record_hash"],
+        #     {
+        #         "clicks",
+        #         "click_view_gclid",
+        #     },
+        # ),
         "display_keyword_performance_report": ReportStream(
             report_definitions.DISPLAY_KEYWORD_PERFORMANCE_REPORT_FIELDS,
             ["display_keyword_view"],
