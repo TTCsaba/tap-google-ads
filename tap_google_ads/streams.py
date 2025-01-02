@@ -512,10 +512,15 @@ def get_query_date(start_date, bookmark, conversion_window_date):
 
     All inputs are datetime strings.
     NOTE: `bookmark` may be None"""
+    # for historical runs no bookmark is available, 
+    # we use 'start_date' provided by user in connect-form
+    # for normal runs, bookmark value would always be present and
+    # priority is given to saved bookmark.
+    # Special case : 
     if not bookmark:
         return singer.utils.strptime_to_utc(start_date)
     else:
-        query_date = max(bookmark, max(start_date, conversion_window_date))
+        query_date = bookmark
         return singer.utils.strptime_to_utc(query_date)
 
 
@@ -727,6 +732,7 @@ class ReportStream(BaseStream):
             conversion_window_date=singer.utils.strftime(conversion_window_date)
         )
 
+        # currently no 'end_date' is provided in config, therefore current_date is always used.
         end_date = config.get("end_date")
         if end_date:
             end_date = utils.strptime_to_utc(end_date)
@@ -742,6 +748,8 @@ class ReportStream(BaseStream):
         if selected_fields == {'segments.date'}:
             raise Exception(f"Selected fields is currently limited to {', '.join(selected_fields)}. Please select at least one attribute and metric in order to replicate {stream_name}.")
 
+        # if query_date > end_date, only happens when start_date provided by user is greater than current_date
+        # the loop gets skipped, no data sync occurs
         while query_date <= end_date:
             query = create_report_query(resource_name, selected_fields, query_date)
             LOGGER.info(f"Requesting {stream_name} data for {utils.strftime(query_date, '%Y-%m-%d')}.")
