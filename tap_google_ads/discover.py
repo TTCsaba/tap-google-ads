@@ -136,6 +136,9 @@ def build_resource_metadata(api_objects, resource):
         12: {"type": ["null", "integer"]},
     }
 
+    if resource.name in ['call_view.resource_name', 'campaign_label.resource_name']:
+        resource.data_type = 11
+
     resource_metadata = {
         "name": resource.name,
         "category": CATEGORY_MAP[resource.category],
