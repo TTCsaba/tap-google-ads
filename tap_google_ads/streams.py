@@ -14,7 +14,7 @@ from . import report_definitions
 
 LOGGER = singer.get_logger()
 
-API_VERSION = "v15"
+API_VERSION = "v17"
 
 API_PARAMETERS = {
     "omit_unselected_resource_names": "true"
@@ -159,12 +159,11 @@ def create_core_stream_query(resource_name, selected_fields, last_pk_fetched, fi
     return core_query
 
 
-def create_report_query(resource_name, selected_fields, start_date, end_date):
+def create_report_query(resource_name, selected_fields, query_date):
 
     format_str = "%Y-%m-%d"
-    start_date = utils.strftime(start_date, format_str=format_str)
-    end_date = utils.strftime(end_date, format_str=format_str)
-    report_query = f"SELECT {','.join(selected_fields)} FROM {resource_name} WHERE segments.date BETWEEN '{start_date}' AND '{end_date}' {build_parameters()}"
+    query_date = utils.strftime(query_date, format_str=format_str)
+    report_query = f"SELECT {','.join(selected_fields)} FROM {resource_name} WHERE segments.date = '{query_date}' {build_parameters()}"
 
     return report_query
 
@@ -513,10 +512,15 @@ def get_query_date(start_date, bookmark, conversion_window_date):
 
     All inputs are datetime strings.
     NOTE: `bookmark` may be None"""
+    # for historical runs no bookmark is available, 
+    # we use 'start_date' provided by user in connect-form
+    # for normal runs, bookmark value would always be present and
+    # priority is given to saved bookmark.
+    # Special case : 
     if not bookmark:
         return singer.utils.strptime_to_utc(start_date)
     else:
-        query_date = min(bookmark, max(start_date, conversion_window_date))
+        query_date = bookmark
         return singer.utils.strptime_to_utc(query_date)
 
 
@@ -702,7 +706,7 @@ class ReportStream(BaseStream):
                 )
 
         return transformed_message
-
+    
     def sync(self, sdk_client, customer, stream, config, state, query_limit):
         gas = sdk_client.get_service("GoogleAdsService", version=API_VERSION)
         resource_name = self.google_ads_resource_names[0]
@@ -728,6 +732,7 @@ class ReportStream(BaseStream):
             conversion_window_date=singer.utils.strftime(conversion_window_date)
         )
 
+        # currently no 'end_date' is provided in config, therefore current_date is always used.
         end_date = config.get("end_date")
         if end_date:
             end_date = utils.strptime_to_utc(end_date)
@@ -743,31 +748,36 @@ class ReportStream(BaseStream):
         if selected_fields == {'segments.date'}:
             raise Exception(f"Selected fields is currently limited to {', '.join(selected_fields)}. Please select at least one attribute and metric in order to replicate {stream_name}.")
 
-        query = create_report_query(resource_name, selected_fields, query_date, end_date)
-        LOGGER.info(f"Requesting {stream_name} data for {utils.strftime(query_date, '%Y-%m-%d')}.")
+        # if query_date > end_date, only happens when start_date provided by user is greater than current_date
+        # the loop gets skipped, no data sync occurs
+        while query_date <= end_date:
+            query = create_report_query(resource_name, selected_fields, query_date)
+            LOGGER.info(f"Requesting {stream_name} data for {utils.strftime(query_date, '%Y-%m-%d')}.")
 
-        try:
-            response = make_request(gas, query, customer["customerId"], config)
-        except GoogleAdsException as err:
-            LOGGER.warning("Failed query: %s", query)
-            LOGGER.critical(str(err.failure.errors[0].message))
-            raise RuntimeError from None
+            try:
+                response = make_request(gas, query, customer["customerId"], config)
+            except GoogleAdsException as err:
+                LOGGER.warning("Failed query: %s", query)
+                LOGGER.critical(str(err.failure.errors[0].message))
+                raise RuntimeError from None
 
-        with Transformer() as transformer:
-            # Pages are fetched automatically while iterating through the response
-            for message in response:
-                json_message = google_message_to_json(message)
-                transformed_message = self.transform_keys(json_message)
-                record = transformer.transform(transformed_message, stream["schema"])
-                record["_sdc_record_hash"] = generate_hash(record, stream_mdata)
 
-                singer.write_record(stream_name, record)
+            with Transformer() as transformer:
+                # Pages are fetched automatically while iterating through the response
+                for message in response:
+                    json_message = google_message_to_json(message)
+                    transformed_message = self.transform_keys(json_message)
+                    record = transformer.transform(transformed_message, stream["schema"])
+                    record["_sdc_record_hash"] = generate_hash(record, stream_mdata)
 
-        new_bookmark_value = {replication_key: utils.strftime(query_date)}
-        singer.write_bookmark(state, stream["tap_stream_id"], customer["customerId"], new_bookmark_value)
+                    singer.write_record(stream_name, record)
 
-        singer.write_state(state)
+            new_bookmark_value = {replication_key: utils.strftime(query_date)}
+            singer.write_bookmark(state, stream["tap_stream_id"], customer["customerId"], new_bookmark_value)
 
+            singer.write_state(state)
+
+            query_date += timedelta(days=1)
 
 def initialize_core_streams(resource_schema):
     return {
