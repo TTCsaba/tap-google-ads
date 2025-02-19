@@ -507,7 +507,7 @@ class BaseStream:  # pylint: disable=too-many-instance-attributes
             singer.write_state(state)
 
 
-def get_query_date(start_date, bookmark, conversion_window_date):
+def get_query_date(start_date, bookmark, conversion_window):
     """Return a date within the conversion window and after start date
 
     All inputs are datetime strings.
@@ -520,8 +520,10 @@ def get_query_date(start_date, bookmark, conversion_window_date):
     if not bookmark:
         return singer.utils.strptime_to_utc(start_date)
     else:
-        query_date = bookmark
-        return singer.utils.strptime_to_utc(query_date)
+        return max(
+            singer.utils.strptime_to_utc(bookmark) - conversion_window,
+            singer.utils.strptime_to_utc(start_date)
+        )
 
 
 class UserInterestStream(BaseStream):
@@ -729,7 +731,7 @@ class ReportStream(BaseStream):
         query_date = get_query_date(
             start_date=config["start_date"],
             bookmark=bookmark_value,
-            conversion_window_date=singer.utils.strftime(conversion_window_date)
+            conversion_window=conversion_window
         )
 
         # currently no 'end_date' is provided in config, therefore current_date is always used.
