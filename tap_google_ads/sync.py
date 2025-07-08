@@ -75,6 +75,7 @@ def get_query_limit(config):
 
 
 def get_managed_customers(config):
+    LOGGER.debug("start get_managed_customers")
     manager_account_id = config.get("manager_account_id", None) or None
     selected_account_ids = config.get('account_ids', [])
     
@@ -86,10 +87,12 @@ def get_managed_customers(config):
 
     for client in query_customers:
         customers.append({"loginCustomerId": manager_account_id, "customerId": client})
+    LOGGER.debug("end get_managed_customers")    
     return customers
 
 
 def do_sync(config, catalog, resource_schema, state):
+    LOGGER.debug("start do_sync")
     customers = get_managed_customers(config)
 
     # Get query limit
