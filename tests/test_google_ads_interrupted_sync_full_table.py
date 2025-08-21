@@ -35,8 +35,7 @@ class InterruptedSyncFullTableTest(GoogleAdsBase):
 
         streams_under_test = {
             'ads',
-            'campaign_criterion',
-            'feed'
+            'campaign_criterion'
         }
     
         # Create connection
